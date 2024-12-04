@@ -33,7 +33,7 @@ bool shouldSaveConfig = false;
 bool isAuthenticated = false; // Bandera para saber si el usuario está autenticado
 
 // Definir la URL de la API de autenticación PHP
-const char* api_login_url = "http://192.168.18.99/atmovibe/login.php";
+const char* api_login_url = "http://192.168.43.233/atmovibe/login.php";
 
 void saveConfig() {
   Serial.println("Saving config...");
@@ -136,12 +136,15 @@ void setup() {
   
   loadConfig();
 
-  WiFi.begin("APTO4A", "angel1912leg3526");  // Cambia esto por tus credenciales
+  WiFi.begin("Esteban", "123456789A");  // Cambia esto por tus credenciales
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   Serial.println("WiFi connected!");
+
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 
   // Página de login
   server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -169,16 +172,33 @@ void setup() {
         isAuthenticated = true;
         request->redirect("/config");
       } else {
-        request->send(401, "text/html", "<html><body><h1>Usuario o Contraseña Incorrectos!</h1><a href='/login'>Volver</a></body></html>");
+        String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+            html += "<style>";
+            html += "body { font-family: Arial, sans-serif; background-color: #f2f2f2; text-align: center; margin: 0; padding: 0; }";
+            html += ".container { padding-top: 100px; text-align: center; max-width: 600px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2); }";
+            html += "h1 { color: #d62020; font-size: 2em; margin-bottom: 20px; }";
+            html += "a { font-size: 1.2em; color: #4CAF50; text-decoration: none; border-bottom: 1px solid #4CAF50; }";
+            html += "a:hover { color: #388E3C; border-bottom: 1px solid #388E3C; }";
+            html += "</style></head><body>";
+
+            // Contenido principal con el mensaje de error
+            html += "<div class='container'>";
+            html += "<h1>Usuario o Contraseña Incorrectos!</h1>";
+            html += "<a href='/login'>Volver a Iniciar Sesión</a>";
+            html += "</div>";
+
+            html += "</body></html>";
+
+            request->send(401, "text/html", html);
       }
     }
   });
 
  // Página de configuración (solo si está autenticado)
-  server.on("/config", HTTP_GET, [](AsyncWebServerRequest *request){
+server.on("/config", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!isAuthenticated) {
-      request->redirect("/login");
-      return;
+        request->redirect("/login");
+        return;
     }
     String html = "<html><head><meta charset='UTF-8'><style>";
     html += "body { font-family: Arial; background-color: #f2f2f2; }";
@@ -192,6 +212,7 @@ void setup() {
     html += "<div class='navbar'>";
     html += "<a href='/config'>Configuración</a>";
     html += "<a href='/datos'>Datos</a>";
+    html += "<a href='/logout'>Cerrar Sesión</a>"; // Nuevo enlace de Cerrar Sesión
     html += "</div>";
     html += "<h2 style='text-align: center;'>Configuración del Sistema</h2>";
     html += "<form action='/save' method='POST'>";
@@ -205,7 +226,8 @@ void setup() {
     html += "</form>";
     html += "</body></html>";
     request->send(200, "text/html", html);
-  });
+});
+
 
   // Página de guardar configuración
 server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
@@ -276,12 +298,17 @@ server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
 
 
   // Página de mostrar datos
-  server.on("/datos", HTTP_GET, [](AsyncWebServerRequest *request){
+server.on("/datos", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (!isAuthenticated) {
+        request->redirect("/login");
+        return;
+    }
     String html = "<html><head><meta charset='UTF-8'><style>";
     html += "body { font-family: Arial, sans-serif; background-color: #f2f2f2; text-align: center; margin: 0; padding: 0; }";
     html += ".navbar { overflow: hidden; background-color: #00C853; padding: 10px 0; margin-bottom: 20px; }";
     html += ".navbar a { float: left; display: block; color: #f2f2f2; text-align: center; padding: 14px 20px; text-decoration: none; font-size: 17px; }";
     html += ".navbar a:hover { background-color: #ddd; color: black; }";
+    html += "<a href='/logout'>Cerrar Sesión</a>"; // Nuevo enlace de Cerrar Sesión
     html += ".iframe-container { display: flex; justify-content: center; align-items: center; padding: 20px 0; }";
     html += "iframe { max-width: 100%; width: 80%; height: 500px; border: none; }";
     html += ".container { padding-top: 20px; text-align: center; max-width: 100%; margin: 0 auto; }";
@@ -290,6 +317,7 @@ server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
     html += "<div class='navbar'>";
     html += "<a href='/config'>Configuración</a>";
     html += "<a href='/datos'>Datos</a>";
+    html += "<a href='/logout'>Cerrar Sesión</a>"; // Enlace para Cerrar Sesión
     html += "</div>";
     html += "<div class='container'>";
     html += "<h1>Gráfica de Datos de CO2</h1>";
@@ -297,7 +325,14 @@ server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request){
     html += "</div>";
     html += "</body></html>";
     request->send(200, "text/html", html);
-  });
+});
+
+    // Página de cierre de sesión
+    server.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request){
+        isAuthenticated = false; 
+        request->redirect("/login"); 
+    });
+
 
   server.begin();
   Serial.println("Server started");
